@@ -7,10 +7,8 @@ cflag=1;           		% 0/1 quantum/classical
 imax=5000;			% maximum number of newton iterations
 %
 %****************INPUT PARAMETERS!!!*********************
-%
-fid1=fopen('cvdata','w');	% Initialize output file; first arg is filename
 T = 300;            		% temperature (K)
-Ns =-2.5E19;    			% Substrate doping concentration (cm^-3)
+Ns =-2.5E18;    			% Substrate doping concentration (cm^-3)
 				% (-/+ for n/p-type);
 Tox=10.8E-7;         		% Oxide thickness (cm)
 pd = 0;            		% consider poly depletion? 1: yes 0: no
@@ -20,7 +18,7 @@ Vfb=-0.88;				% 99 means autocalculate, else uses value
 				% For metal gate, please input Vfb here
 Dvc=  1e-4;       		% small signal voltage for capacitance
 np=sign(Ns);			% (do not edit this line) n-sub or p-sub
-Vstart=(0.2)*np*1;       	% Silicon Voltage: start (accumulation)
+Vstart=(-0.2)*np*1;       	% Silicon Voltage: start (accumulation)
 Vend=np*(-0.2);         		% Silicon Voltage: end   (inversion)
 Nvstep=2;         		% number of voltage steps 
 %
@@ -72,7 +70,6 @@ md1 = 0.19;        % Density of state mass low energy valley (3,6)
 md2 = 0.417;       % Density of state mass high energy valley (1,4,2,5)
 mc1 = 0.19;        % Conductivity     mass low energy valley (3,6)
 mc2 = 0.315;       % Conductivity     mass high energy valley (1,4,2,5)
-me=m0;
 mp=1.67E-27;
 %
 %****************NUMERICAL CONSTANTS******************
@@ -114,7 +111,6 @@ else
 end
 Ef=+k*T*log(Nep0/ni);                 % definition of Fermi
 %
-fprintf('Matrix for Poisson is %g by %g square \n',N,N);
 Nen= zeros(N,1);  
 Nep= zeros(N,1);  
 Ne = zeros(N,1);  
@@ -126,11 +122,10 @@ VS = zeros(N,1);
 A = zeros(N,N);  % Matrix for 2nd differential operator 
 A(1,1)=1/dx0^2;	 %bondary condition Vsurface=Vs
 
-gamma=1;
-be=gamma*hb^2*q0*q0/(4*pi^2*me*6);
-bp=0;
-%bp=gamma*hb^2*q0/(4*pi^2*mp*6);
-count=0;
+gamma=10;
+reduceh=1.054E-34;
+be=gamma*reduceh^2/(6*m0*q0);
+bp=gamma*reduceh^2/(6*m0*q0);
 %----------------------------------------------------
 for j=2:N-1
     avgdx=(dx(j-1)+dx(j))/2;
@@ -139,24 +134,8 @@ for j=2:N-1
     A(j,j+1) = 1/dx(j)/avgdx;
 end;
 A(N,N)=1/dx(N-1)^2;     
-%
-%************** BEGIN CALCULATIONS *************************
-%
-fprintf(fid1,'Vs          Vg          Cac         Lndc        Lnac        Lpdc        Lpac        Es          Qtot        Qinv        \n');
-%
-%**************LOOP FOR EACH VOLTAGE STEP*************************
-%
-for ivl=1:Nvstep
-  Vss(1)=Vs0(ivl)-Dvc; % for capacitance calculation purpose (dV)
-  Vss(2)=Vs0(ivl);
-%
-%**************LOOP FOR CAPACITANCE CALCULATION*******************
-%
-  for icc=1:2
-    Vs=Vss(icc);
-%
-%**************POISSON EQUATION SETUP*****************************
-%
+
+    Vs=0.2;
     Rho(1)=Vs/dx0^2;  %bondary condition on the surface	 
     Rho(N)=0;  %bondary condition V(N)=0
     V0=A\Rho; %inital guess
@@ -166,23 +145,15 @@ for ivl=1:Nvstep
 %
 %***************** NEWTON LOOP ********************************** 
 %
-    for i=1:imax;  
-        
+    for i=1:1000
+        i
+       %holes
       Nep=+Nep0*exp(-beta*V0); 
-
       % Electron
-        Nen=+ni^2./Nep;
-      
-      %density gradient part
-      %{
-          for k=2:N-1
-          correctionN(k)=-1*be*(sqrt(Nen(k+1))+sqrt(Nen(k-1))-2*sqrt(Nen(k)))/(dx(k)^2*sqrt(Nen(j)));
-          correctionP(k)=-1*bp*(sqrt(Nep(k+1))+sqrt(Nep(k-1))-2*sqrt(Nep(k)))/(dx(k)^2*sqrt(Nep(j)));
-      end;
-      %}     
+      Nen=+ni^2./Nep;
+         
       Ne=-sign(np)*Nad-Nen+Nep; 	% Net charge density
       deltaNe=-beta*Nep-beta*Nen; 	% gradient for NR method
-
       Rho=-q0*Ne/eps0/eps1;
       deltaRho=-q0*deltaNe/eps0/eps1;
       
@@ -190,15 +161,19 @@ for ivl=1:Nvstep
       sqrtNep=sqrt(Nep);
       correctionN=-1*be*((A*sqrtNen)./sqrt(Nen));
       correctionP=-1*bp*((A*sqrtNep)./sqrt(Nep));
+      coreectionN(1)=0;
+      correctionP(1)=0;
+      coreectionN(N)=0;
+      correctionP(N)=0;
       
+      %V0=V0+0.5*correctionN-0.5*correctionP;
       B=zeros(N,1);
-      
       for row=1:N
           b=0;
           for col=1:N
               b=b+A(row,col)*sqrt(Nen0)*exp(V0(col)/(2*vt));
           end
-          B(row)=b;%/sqrt(Nen0)*exp^(V0(row)/(2*vt));
+          B(row)=b;
       end
               
         
@@ -206,28 +181,49 @@ for ivl=1:Nvstep
        for row=1:N
           for col=1:N
               if row==col
-                  Bdash(row,row)=-be*(0.5/(sqrt(Nen0)*vt))*(B(row)-A(row,row)*sqrt(Nen0)*exp(V0(row)/(2*vt)))*exp(-0.5*V0(row)/vt);
+                  Bdash(row,row)=-be*(0.5/(sqrt(Nen0)*vt))*(B(row)-A(row,row)*sqrt(Nen0)*exp(V0(row)/(2*vt)))*exp(-0.5*V0(row)/vt);                                  
               else
-                  Bdash(row,col)=-be*(0.5/(sqrt(Nen0)*vt))*A(row,col)*exp(0.5*(V0(col)-V0(row))/vt);
+                  Bdash(row,col)=-be*(0.5/vt)*A(row,col)*exp(0.5*(V0(col)-V0(row))/vt);                                 
               end
           end
-         
+       end 
+       
+       B=zeros(N,1);
+      for row=1:N
+          b=0;
+          for col=1:N
+              b=b+A(row,col)*sqrt(Nep0)*exp(V0(col)/(2*vt));
+          end
+          B(row)=b;
       end
+              
+        
+       BdashP=zeros(N,N);
+       for row=1:N
+          for col=1:N
+              if row==col
+                  BdashP(row,row)=-bp*(0.5/(sqrt(Nep0)*vt))*(B(row)-A(row,row)*sqrt(Nep0)*exp(V0(row)/(2*vt)))*exp(-0.5*V0(row)/vt);                                  
+              else
+                  BdashP(row,col)=-bp*(0.5/vt)*A(row,col)*exp(0.5*(V0(col)-V0(row))/vt);                                 
+              end
+          end
+       end 
       
-    
+        
+      
       %Set up the Newton Raphson matrix
       NR=A;
       for j=2:N-1
         NR(j,j)=NR(j,j)-deltaRho(j);
       end
-      NR=NR+A*Bdash;
-      R=-A*(V0+correctionN+correctionP)+Rho;	
+      V0=V0+correctionN+correctionP;
+      NR=NR+A*(Bdash+BdashP);
+      R=-A*V0+Rho;
 %
       R(1)=0;
       R(N)=0;
       deltaV0=NR\R;  % Potential in eV
       V0=V0+deltaV0; % Update the V0
-%
       % convergence test
       dsort=max(abs(deltaV0));
       if(dsort<1.0e-12)
@@ -235,8 +231,7 @@ for ivl=1:Nvstep
       end 
       
     end 				% Newton loop
-  end
-end
+
 %++++++++++++++++++++++++++++++++++++++++++++++++++++
 %plot(xscale,V0);
 toc
