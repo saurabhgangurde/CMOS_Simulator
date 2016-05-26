@@ -145,14 +145,13 @@ A(N,N)=1/dx(N-1)^2;
 %
 %***************** NEWTON LOOP ********************************** 
 %
-    for i=1:1000
+    for i=1:0
         i
        %holes
       Nep=+Nep0*exp(-beta*V0); 
       % Electron
       Nen=+ni^2./Nep;
-      
-   
+         
       Ne=-sign(np)*Nad-Nen+Nep; 	% Net charge density
       deltaNe=-beta*Nep-beta*Nen; 	% gradient for NR method
       Rho=-q0*Ne/eps0/eps1;
@@ -160,73 +159,21 @@ A(N,N)=1/dx(N-1)^2;
       
       sqrtNen=sqrt(Nen);
       sqrtNep=sqrt(Nep);
-      correctionN=-1*be*((A*sqrtNen)./sqrtNen);
-      correctionP=-1*bp*((A*sqrtNep)./sqrtNep);
-      Nen(1)=0;
-      Nep(1)=0;
-      coreectionN(1)=0;
-      correctionP(1)=0;
-      coreectionN(N)=0;
-      correctionP(N)=0;
-      
-      V0=V0+correctionN+correctionP;
-      B=zeros(N,1);
-      for row=1:N
-          b=0;
-          for col=1:N
-              b=b+A(row,col)*sqrt(Nen0)*exp(V0(col)/(2*vt));
-          end
-          B(row)=b;
-      end
-              
-        
-       Bdash=zeros(N,N);
-       for row=1:N
-          for col=1:N
-              if row==col
-                  Bdash(row,row)=-be*(0.5/(sqrt(Nen0)*vt))*(B(row)-A(row,row)*sqrt(Nen0)*exp(V0(row)/(2*vt)))*exp(-0.5*V0(row)/vt);                                  
-              else
-                  Bdash(row,col)=-be*(0.5/vt)*A(row,col)*exp(0.5*(V0(col)-V0(row))/vt);                                 
-              end
-          end
-       end 
-       
-       B=zeros(N,1);
-      for row=1:N
-          b=0;
-          for col=1:N
-              b=b+A(row,col)*sqrt(Nep0)*exp(V0(col)/(2*vt));
-          end
-          B(row)=b;
-      end
-              
-        
-       BdashP=zeros(N,N);
-       for row=1:N
-          for col=1:N
-              if row==col
-                  BdashP(row,row)=-bp*(0.5/(sqrt(Nep0)*vt))*(B(row)-A(row,row)*sqrt(Nep0)*exp(V0(row)/(2*vt)))*exp(-0.5*V0(row)/vt);                                  
-              else
-                  BdashP(row,col)=-bp*(0.5/vt)*A(row,col)*exp(0.5*(V0(col)-V0(row))/vt);                                 
-              end
-          end
-       end 
-      
-        
-      
+
+
       %Set up the Newton Raphson matrix
       NR=A;
       for j=2:N-1
         NR(j,j)=NR(j,j)-deltaRho(j);
       end
-      %V0=V0+correctionN+correctionP;
-      NR=NR+A*(Bdash+BdashP);
       R=-A*V0+Rho;
 %
       R(1)=0;
       R(N)=0;
       deltaV0=NR\R;  % Potential in eV
       V0=V0+deltaV0; % Update the V0
+      
+      Nen=DG(V0,Nen,A,ni);
       % convergence test
       dsort=max(abs(deltaV0));
       if(dsort<1.0e-12)
@@ -238,3 +185,4 @@ A(N,N)=1/dx(N-1)^2;
 %++++++++++++++++++++++++++++++++++++++++++++++++++++
 %plot(xscale,V0);
 toc
+
