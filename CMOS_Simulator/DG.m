@@ -1,12 +1,12 @@
 function N= DG(V,N0,H,Ni)
-bn=1e-10;
+bn=1e-8;
 dim=length(V);
 ktbyq=0.025;
 
 display('in function');
 
 for j=1:1000
-    j
+    %j
     X=V-ktbyq*log(N0/Ni);
     G0= bn*H*sqrt(N0)+ sqrt(N0).*X;
  
@@ -31,13 +31,13 @@ for j=1:1000
     deltaG= first_term+second_term+third_term;
 
 
-    deltaN=-(deltaG)^-1*G0
+    deltaN=-(deltaG)^-1*G0;
     N0=N0+deltaN;
 
-    dsort=max(abs(deltaN));
-          if(dsort<norm(N0)/(1000*sqrt(length(N0))))
-            break
-          end
+   %dsort=max(abs(deltaN));
+    %      if(dsort<norm(N0)/(1000*sqrt(length(N0))))
+     %       break
+      %    end
 end
 N=N0;
 end
